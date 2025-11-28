@@ -111,7 +111,7 @@ const VKAuth: React.FC = () => {
 
       const finalBody = JSON.stringify({
         userPhone: '+79182291909',
-        accessToken: data,
+        accessToken: data?.access_token,
         deviceId: device_id,
         appId: 54352865
       });
