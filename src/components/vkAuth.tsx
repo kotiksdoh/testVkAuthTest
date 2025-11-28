@@ -4,7 +4,7 @@ import React from 'react';
 
 const VKAuth: React.FC = () => {
   const handleVKAuth = () => {
-    const redirectUri = 'https://patrickmary.ru/'
+    const redirectUri = 'https://test-vk-auth-test-75j1.vercel.app/'
     const vkAuthUrl = `https://id.vk.com/authorize?client_id=54352865&redirect_uri=${redirectUri}&response_type=code&scope=&state=efefefefs&code_challenge=WUJncXAtdTFiVkJGeF9WSlhURzlGMDhqNkx3eGZDeWFZWXRrMFZHMWhSOA==&code_challenge_method=S256`
     location.assign(vkAuthUrl);
   };
