@@ -174,6 +174,7 @@ const VKAuth: React.FC = () => {
       setError(err instanceof Error ? err.message : 'Unknown error occurred');
     } finally {
       setLoading(false);
+      console.log(isTokenReceived)
     }
   };
 
