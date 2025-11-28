@@ -1,11 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 
-interface VKAuthResponse {
-  access_token: string;
-  user_id: number;
-  email?: string;
-  expires_in: number;
-}
+
 
 const VKAuth: React.FC = () => {
   const handleVKAuth = () => {
