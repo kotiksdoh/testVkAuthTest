@@ -57,6 +57,7 @@ const VKAuth: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [phoneNumber, setPhoneNumber] = useState<string>('');
+  const [isTokenReceived, setIsTokenReceived] = useState(false);
   
   const { codeChallenge, codeVerifier, isLoading: pkceLoading } = usePKCE();
 
@@ -106,15 +107,36 @@ const VKAuth: React.FC = () => {
 
       const data = await response.json();
       setTokenData(data);
+      setIsTokenReceived(true); // Устанавливаем флаг, что токен получен
       console.log('Token response:', data);
 
-      // Используем введенный номер телефона вместо хардкода
+    } catch (err) {
+      console.error('Error exchanging code for token:', err);
+      setError(err instanceof Error ? err.message : 'Unknown error occurred');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Функция для отправки финального запроса с номером телефона
+  const sendFinalRequest = async () => {
+    if (!tokenData || !authParams.device_id || !phoneNumber) {
+      console.error('Missing data for final request');
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
       const finalBody = JSON.stringify({
-        userPhone: phoneNumber, // Теперь используется введенный номер
-        accessToken: data?.access_token,
-        deviceId: device_id,
+        userPhone: phoneNumber, 
+        accessToken: tokenData.access_token,
+        deviceId: authParams.device_id,
         appId: 54352865
       });
+
+      console.log('Sending final request with phone:', phoneNumber);
 
       const finalResponse = await fetch('https://test1.patrickmary.ru/api/data/open/iud_confirm_vk_phone', {
         method: 'POST',
@@ -133,7 +155,7 @@ const VKAuth: React.FC = () => {
       console.log('Ура!!', finallllData);
 
     } catch (err) {
-      console.error('Error exchanging code for token:', err);
+      console.error('Error in final request:', err);
       setError(err instanceof Error ? err.message : 'Unknown error occurred');
     } finally {
       setLoading(false);
@@ -157,7 +179,7 @@ const VKAuth: React.FC = () => {
         exchangeCodeForToken(code, device_id);
       }
     }
-  }, [phoneNumber]); // Добавляем phoneNumber в зависимости
+  }, []); // Убираем phoneNumber из зависимостей
 
   // Функция для валидации номера телефона
   const isValidPhoneNumber = (phone: string): boolean => {
@@ -165,7 +187,8 @@ const VKAuth: React.FC = () => {
     return phoneRegex.test(phone);
   };
 
-  const isButtonDisabled = loading || pkceLoading || !isValidPhoneNumber(phoneNumber);
+  const isAuthButtonDisabled = loading || pkceLoading || !isValidPhoneNumber(phoneNumber);
+  const isSendButtonDisabled = loading || !isTokenReceived || !isValidPhoneNumber(phoneNumber);
 
   return (
     <div className="vk-auth-container">
@@ -212,6 +235,15 @@ const VKAuth: React.FC = () => {
         <div className="token-data">
           <h3>Данные токена:</h3>
           <pre>{JSON.stringify(tokenData, null, 2)}</pre>
+          {isTokenReceived && (
+            <button 
+              className="send-button"
+              onClick={sendFinalRequest}
+              disabled={isSendButtonDisabled}
+            >
+              Отправить данные с номером телефона
+            </button>
+          )}
         </div>
       )}
 
@@ -225,7 +257,7 @@ const VKAuth: React.FC = () => {
       <button 
         className="vk-auth-button"
         onClick={handleVKAuth}
-        disabled={isButtonDisabled}
+        disabled={isAuthButtonDisabled}
       >
         <div className="vk-button-content">
           <svg className="vk-icon" width="20" height="20" viewBox="0 0 24 24">
