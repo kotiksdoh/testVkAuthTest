@@ -8,99 +8,20 @@ interface VKAuthResponse {
 }
 
 const VKAuth: React.FC = () => {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [userData, setUserData] = useState<VKAuthResponse | null>(null);
-
-  // ID вашего приложения VK
-  const APP_ID = 'YOUR_APP_ID';
-  const REDIRECT_URI = `${window.location.origin}/vk-auth`;
-  const SCOPE = 'email'; // Запрашиваемые права
-
-  const openVKAuth = () => {
-    const width = 600;
-    const height = 700;
-    const left = (window.screen.width - width) / 2;
-    const top = (window.screen.height - height) / 2;
-
-    const authUrl = `https://oauth.vk.com/authorize?` +
-      `client_id=${APP_ID}` +
-      `&display=popup` +
-      `&redirect_uri=${encodeURIComponent(REDIRECT_URI)}` +
-      `&scope=${SCOPE}` +
-      `&response_type=token` +
-      `&v=5.131`;
-
-    window.open(
-      authUrl,
-      'VK Auth',
-      `width=${width},height=${height},left=${left},top=${top}`
-    );
+  const handleVKAuth = () => {
+    const redirectUri = 'https://patrickmary.ru/'
+    const vkAuthUrl = `https://id.vk.com/authorize?client_id=54352865&redirect_uri=${redirectUri}&response_type=code&scope=&state=efefefefs&code_challenge=WUJncXAtdTFiVkJGeF9WSlhURzlGMDhqNkx3eGZDeWFZWXRrMFZHMWhSOA==&code_challenge_method=S256`
+    location.assign(vkAuthUrl);
   };
 
-  // Обработка callback от VK
-  useEffect(() => {
-    const handleMessage = (event: MessageEvent) => {
-      // Проверяем источник сообщения для безопасности
-      if (event.origin !== 'https://oauth.vk.com') return;
 
-      if (event.data.type === 'VK_AUTH_SUCCESS') {
-        const authData: VKAuthResponse = event.data.data;
-        
-        setUserData(authData);
-        setIsAuthenticated(true);
-        
-        // Сохраняем в localStorage
-        localStorage.setItem('vk_access_token', authData.access_token);
-        localStorage.setItem('vk_user_id', authData.user_id.toString());
-        
-        // Закрываем popup окно
-        if (event.source && 'close' in event.source) {
-          (event.source as Window).close();
-        }
-      }
-    };
-
-    window.addEventListener('message', handleMessage);
-    return () => window.removeEventListener('message', handleMessage);
-  }, []);
-
-  // Проверяем hash параметры (альтернативный способ)
-  useEffect(() => {
-    const hash = window.location.hash.substring(1);
-    if (hash && window.opener) {
-      const params = new URLSearchParams(hash);
-      const accessToken = params.get('access_token');
-      const userId = params.get('user_id');
-
-      if (accessToken && userId) {
-        const authData: VKAuthResponse = {
-          access_token: accessToken,
-          user_id: parseInt(userId),
-          expires_in: 86400
-        };
-
-        // Отправляем данные в родительское окно
-        window.opener.postMessage({
-          type: 'VK_AUTH_SUCCESS',
-          data: authData
-        }, window.location.origin);
-      }
-    }
-  }, []);
-
-  const handleLogout = () => {
-    setIsAuthenticated(false);
-    setUserData(null);
-    localStorage.removeItem('vk_access_token');
-    localStorage.removeItem('vk_user_id');
-  };
 
   return (
     <div className="vk-auth-container">
-      {!isAuthenticated ? (
+      {/* {!isAuthenticated ? ( */}
         <button 
           className="vk-auth-button"
-          onClick={openVKAuth}
+          onClick={handleVKAuth}
         >
           <div className="vk-button-content">
             <svg className="vk-icon" width="20" height="20" viewBox="0 0 24 24">
@@ -109,8 +30,8 @@ const VKAuth: React.FC = () => {
             Войти через VK
           </div>
         </button>
-      ) : (
-        <div className="user-info">
+      {/* ) : ( */}
+        {/* <div className="user-info">
           <h3>Успешная авторизация!</h3>
           <p>User ID: {userData?.user_id}</p>
           <p>Email: {userData?.email || 'Не указан'}</p>
@@ -118,7 +39,7 @@ const VKAuth: React.FC = () => {
             Выйти
           </button>
         </div>
-      )}
+      )} */}
     </div>
   );
 };
