@@ -1,4 +1,42 @@
 import React, { useEffect, useState } from 'react';
+const usePKCE = () => {
+  const [codeVerifier, setCodeVerifier] = useState<string>('');
+  const [codeChallenge, setCodeChallenge] = useState<string>('');
+  const generateCodeVerifier = (): string => {
+    const array = new Uint8Array(32);
+    window.crypto.getRandomValues(array);
+    const base64 = btoa(Array.from(array, (byte) => String.fromCharCode(byte)).join(''));
+    return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+  };
+  const generateCodeChallenge = async (verifier: string): Promise<string> => {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(verifier);
+    const hash = await window.crypto.subtle.digest('SHA-256', data);
+  
+    const hashArray = new Uint8Array(hash);
+    const base64 = btoa(Array.from(hashArray, (byte) => String.fromCharCode(byte)).join(''));
+  
+    return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+  };
+  useEffect(() => {
+    const generatePKCE = async () => {
+      const verifier = generateCodeVerifier();
+      const challenge = await generateCodeChallenge(verifier);
+
+      setCodeVerifier(verifier);
+      setCodeChallenge(challenge);
+
+      // Сохраняем в localStorage для использования после редиректа
+      localStorage.setItem('vk_code_verifier', verifier);
+    };
+
+    generatePKCE();
+  }, []);
+
+  return { codeVerifier, codeChallenge };
+};
+
+const { codeChallenge } = usePKCE();
 
 const VKAuth: React.FC = () => {
   const [authParams, setAuthParams] = useState<{ code: string | null; device_id: string | null }>({
@@ -9,10 +47,10 @@ const VKAuth: React.FC = () => {
   const [finalData, setFinalData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
+  
   const handleVKAuth = () => {
     const redirectUri = 'https://test-vk-auth-test-75j1.vercel.app/'
-    const vkAuthUrl = `https://id.vk.com/authorize?client_id=54352865&redirect_uri=${redirectUri}&response_type=code&scope=&state=efefefefs&code_challenge=WUJncXAtdTFiVkJGeF9WSlhURzlGMDhqNkx3eGZDeWFZWXRrMFZHMWhSOA==&code_challenge_method=S256`
+    const vkAuthUrl = `https://id.vk.com/authorize?client_id=54352865&redirect_uri=${redirectUri}&response_type=code&scope=&state=efefefefs&code_challenge=${codeChallenge}&code_challenge_method=S256`
     location.assign(vkAuthUrl);
   };
 
@@ -28,7 +66,7 @@ const VKAuth: React.FC = () => {
       formData.append('device_id', device_id);
       formData.append('grant_type', 'authorization_code');
       formData.append('redirect_uri', 'https://test-vk-auth-test-75j1.vercel.app/');
-      formData.append('code_verifier', 'WUJncXAtdTFiVkJGeF9WSlhURzlGMDhqNkx3eGZDeWFZWXRrMFZHMWhSOA==');
+      formData.append('code_verifier', `${codeChallenge}`);
     
       const response = await fetch('https://id.vk.ru/oauth2/auth', {
         method: 'POST',
