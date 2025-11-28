@@ -109,7 +109,7 @@ const VKAuth: React.FC = () => {
       const data = await response.json();
       setTokenData(data);
       setIsTokenReceived(true);
-      setShowPhoneInput(true); // Показываем поле для номера телефона
+      setShowPhoneInput(true);
       console.log('Token response:', data);
 
     } catch (err) {
@@ -120,7 +120,6 @@ const VKAuth: React.FC = () => {
     }
   };
 
-  // Функция для отправки финального запроса с номером телефона
   const sendFinalRequest = async () => {
     if (!tokenData || !authParams.device_id || !phoneNumber) {
       console.error('Missing data for final request');
@@ -148,23 +147,19 @@ const VKAuth: React.FC = () => {
         body: finalBody,
       });
 
-      // Получаем полный текст ответа
       const responseText = await finalResponse.text();
       
       if (!finalResponse.ok) {
-        // Пытаемся распарсить JSON ошибки, если это возможно
         let errorMessage;
         try {
           const errorData = JSON.parse(responseText);
           errorMessage = `Final request error! status: ${finalResponse.status}\nResponse: ${JSON.stringify(errorData, null, 2)}`;
         } catch {
-          // Если не JSON, используем текст как есть
           errorMessage = `Final request error! status: ${finalResponse.status}\nResponse: ${responseText}`;
         }
         throw new Error(errorMessage);
       }
 
-      // Если ответ успешный, парсим JSON
       const finallllData = JSON.parse(responseText);
       setFinalData(finallllData);
       console.log('Ура!!', finallllData);
@@ -197,7 +192,6 @@ const VKAuth: React.FC = () => {
     }
   }, []);
 
-  // Функция для валидации номера телефона
   const isValidPhoneNumber = (phone: string): boolean => {
     const phoneRegex = /^[\+]?[0-9\s\-\(\)]{10,15}$/;
     return phoneRegex.test(phone);
@@ -256,7 +250,6 @@ const VKAuth: React.FC = () => {
         </div>
       )}
 
-      {/* Кнопка авторизации VK */}
       {!showPhoneInput && (
         <div className="auth-section">
           <div className="section-header">
@@ -286,7 +279,6 @@ const VKAuth: React.FC = () => {
         </div>
       )}
 
-      {/* Информационные блоки */}
       {(authParams.code || authParams.device_id) && (
         <div className="info-section auth-params">
           <h3>Параметры авторизации:</h3>
