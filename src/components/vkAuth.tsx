@@ -107,7 +107,7 @@ const VKAuth: React.FC = () => {
 
       const data = await response.json();
       setTokenData(data);
-      setIsTokenReceived(true); // Устанавливаем флаг, что токен получен
+      setIsTokenReceived(true);
       console.log('Token response:', data);
 
     } catch (err) {
@@ -146,11 +146,24 @@ const VKAuth: React.FC = () => {
         body: finalBody,
       });
 
+      // Получаем полный текст ответа
+      const responseText = await finalResponse.text();
+      
       if (!finalResponse.ok) {
-        throw new Error(`Final request error! status: ${JSON.stringify(finalResponse)}`);
+        // Пытаемся распарсить JSON ошибки, если это возможно
+        let errorMessage;
+        try {
+          const errorData = JSON.parse(responseText);
+          errorMessage = `Final request error! status: ${finalResponse.status}\nResponse: ${JSON.stringify(errorData, null, 2)}`;
+        } catch {
+          // Если не JSON, используем текст как есть
+          errorMessage = `Final request error! status: ${finalResponse.status}\nResponse: ${responseText}`;
+        }
+        throw new Error(errorMessage);
       }
 
-      const finallllData = await finalResponse.json();
+      // Если ответ успешный, парсим JSON
+      const finallllData = JSON.parse(responseText);
       setFinalData(finallllData);
       console.log('Ура!!', finallllData);
 
@@ -179,7 +192,7 @@ const VKAuth: React.FC = () => {
         exchangeCodeForToken(code, device_id);
       }
     }
-  }, []); // Убираем phoneNumber из зависимостей
+  }, []);
 
   // Функция для валидации номера телефона
   const isValidPhoneNumber = (phone: string): boolean => {
@@ -227,7 +240,7 @@ const VKAuth: React.FC = () => {
       {error && (
         <div className="error">
           <h3>Ошибка:</h3>
-          <p>{error}</p>
+          <pre className="error-pre">{error}</pre>
         </div>
       )}
 
