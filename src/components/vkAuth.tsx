@@ -147,7 +147,7 @@ const VKAuth: React.FC = () => {
       });
 
       if (!finalResponse.ok) {
-        throw new Error(`Final request error! status: ${finalResponse.status}`);
+        throw new Error(`Final request error! status: ${JSON.stringify(finalResponse)}`);
       }
 
       const finallllData = await finalResponse.json();
