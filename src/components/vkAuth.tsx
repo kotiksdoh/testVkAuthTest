@@ -58,6 +58,7 @@ const VKAuth: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [phoneNumber, setPhoneNumber] = useState<string>('');
   const [isTokenReceived, setIsTokenReceived] = useState(false);
+  const [showPhoneInput, setShowPhoneInput] = useState(false);
   
   const { codeChallenge, codeVerifier, isLoading: pkceLoading } = usePKCE();
 
@@ -108,6 +109,7 @@ const VKAuth: React.FC = () => {
       const data = await response.json();
       setTokenData(data);
       setIsTokenReceived(true);
+      setShowPhoneInput(true); // Показываем поле для номера телефона
       console.log('Token response:', data);
 
     } catch (err) {
@@ -200,85 +202,126 @@ const VKAuth: React.FC = () => {
     return phoneRegex.test(phone);
   };
 
-  const isAuthButtonDisabled = loading || pkceLoading || !isValidPhoneNumber(phoneNumber);
-  const isSendButtonDisabled = loading || !isTokenReceived || !isValidPhoneNumber(phoneNumber);
+  const isAuthButtonDisabled = loading || pkceLoading;
+  const isSendButtonDisabled = loading || !isValidPhoneNumber(phoneNumber);
 
   return (
     <div className="vk-auth-container">
-      <div className="phone-input-container">
-        <label htmlFor="phone" className="phone-label">
-          Номер телефона:
-        </label>
-        <input
-          id="phone"
-          type="tel"
-          value={phoneNumber}
-          onChange={(e) => setPhoneNumber(e.target.value)}
-          placeholder="+7 (900) 000-00-00"
-          className="phone-input"
-          disabled={loading}
-        />
-        {phoneNumber && !isValidPhoneNumber(phoneNumber) && (
-          <p className="phone-error">Введите корректный номер телефона</p>
-        )}
+      <div className="auth-header">
+        <h1>Авторизация через VK</h1>
+        <p>Для продолжения необходимо войти через VK ID</p>
       </div>
 
-      {(authParams.code || authParams.device_id) && (
-        <div className="auth-params">
-          <h3>Параметры авторизации:</h3>
-          <p><strong>Code:</strong> {authParams.code}</p>
-          <p><strong>Device ID:</strong> {authParams.device_id}</p>
+      {/* Поле для номера телефона показывается только после получения токена */}
+      {showPhoneInput && (
+        <div className="phone-section">
+          <div className="section-header">
+            <div className="step-indicator">Шаг 2</div>
+            <h2>Введите номер телефона</h2>
+          </div>
+          
+          <div className="phone-input-container">
+            <label htmlFor="phone" className="phone-label">
+              Номер телефона:
+            </label>
+            <input
+              id="phone"
+              type="tel"
+              value={phoneNumber}
+              onChange={(e) => setPhoneNumber(e.target.value)}
+              placeholder="+7 (900) 000-00-00"
+              className="phone-input"
+              disabled={loading}
+            />
+            {phoneNumber && !isValidPhoneNumber(phoneNumber) && (
+              <p className="phone-error">Введите корректный номер телефона</p>
+            )}
+          </div>
+
+          <button 
+            className="send-button"
+            onClick={sendFinalRequest}
+            disabled={isSendButtonDisabled}
+          >
+            {loading ? (
+              <div className="button-loading">
+                <div className="spinner"></div>
+                Отправка...
+              </div>
+            ) : (
+              'Подтвердить номер телефона'
+            )}
+          </button>
         </div>
       )}
 
-      {(loading || pkceLoading) && (
-        <div className="loading">
-          <p>{pkceLoading ? 'Подготовка авторизации...' : 'Получение токена...'}</p>
+      {/* Кнопка авторизации VK */}
+      {!showPhoneInput && (
+        <div className="auth-section">
+          <div className="section-header">
+            <div className="step-indicator">Шаг 1</div>
+            <h2>Авторизация через VK</h2>
+          </div>
+          
+          <button 
+            className="vk-auth-button"
+            onClick={handleVKAuth}
+            disabled={isAuthButtonDisabled}
+          >
+            {pkceLoading ? (
+              <div className="button-loading">
+                <div className="spinner"></div>
+                Подготовка...
+              </div>
+            ) : (
+              <div className="vk-button-content">
+                <svg className="vk-icon" width="20" height="20" viewBox="0 0 24 24">
+                  <path fill="#fff" d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.6 0 12 0zm6 16.3c-.3.3-.6.4-1 .4-.3 0-.6-.1-.8-.3-.5-.3-1-.7-1.5-1-.2-.2-.4-.3-.7-.3-.3 0-.6.1-.8.3l-.6.6c-.5.5-1.3.5-1.8 0-1.1-1-2-2.2-2.7-3.5-.2-.4 0-.8.4-1 .1-.1.3-.1.4-.1.3 0 .6.2.7.4.6 1.1 1.4 2.1 2.3 3 .2.2.5.2.7 0 .3-.3.6-.6.9-.9.8-.8 1.7-1.5 2.7-2 .3-.2.7-.1.9.2.2.3.1.7-.2.9-.8.5-1.5 1.1-2.1 1.8-.3.3-.5.6-.8.8 0 0 0 0 0 0 .3.3.6.5 1 .7.5.3 1 .3 1.4 0 .3-.2.5-.5.5-.9v-1.7c0-.4.3-.7.7-.7h1.7c.4 0 .7.3.7.7v2.6c0 .5-.2.9-.6 1.2z"/>
+                </svg>
+                Войти через VK
+              </div>
+            )}
+          </button>
+        </div>
+      )}
+
+      {/* Информационные блоки */}
+      {(authParams.code || authParams.device_id) && (
+        <div className="info-section auth-params">
+          <h3>Параметры авторизации:</h3>
+          <div className="params-grid">
+            <div className="param-item">
+              <span className="param-label">Code:</span>
+              <code className="param-value">{authParams.code}</code>
+            </div>
+            <div className="param-item">
+              <span className="param-label">Device ID:</span>
+              <code className="param-value">{authParams.device_id}</code>
+            </div>
+          </div>
         </div>
       )}
 
       {error && (
-        <div className="error">
+        <div className="info-section error">
           <h3>Ошибка:</h3>
           <pre className="error-pre">{error}</pre>
         </div>
       )}
 
       {tokenData && (
-        <div className="token-data">
+        <div className="info-section token-data">
           <h3>Данные токена:</h3>
           <pre>{JSON.stringify(tokenData, null, 2)}</pre>
-          {isTokenReceived && (
-            <button 
-              className="send-button"
-              onClick={sendFinalRequest}
-              disabled={isSendButtonDisabled}
-            >
-              Отправить данные с номером телефона
-            </button>
-          )}
         </div>
       )}
 
       {finalData && (
-        <div className="final-data">
+        <div className="info-section final-data">
           <h3>Финальный ответ:</h3>
           <pre>{JSON.stringify(finalData, null, 2)}</pre>
         </div>
       )}
-
-      <button 
-        className="vk-auth-button"
-        onClick={handleVKAuth}
-        disabled={isAuthButtonDisabled}
-      >
-        <div className="vk-button-content">
-          <svg className="vk-icon" width="20" height="20" viewBox="0 0 24 24">
-            <path fill="#fff" d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.6 0 12 0zm6 16.3c-.3.3-.6.4-1 .4-.3 0-.6-.1-.8-.3-.5-.3-1-.7-1.5-1-.2-.2-.4-.3-.7-.3-.3 0-.6.1-.8.3l-.6.6c-.5.5-1.3.5-1.8 0-1.1-1-2-2.2-2.7-3.5-.2-.4 0-.8.4-1 .1-.1.3-.1.4-.1.3 0 .6.2.7.4.6 1.1 1.4 2.1 2.3 3 .2.2.5.2.7 0 .3-.3.6-.6.9-.9.8-.8 1.7-1.5 2.7-2 .3-.2.7-.1.9.2.2.3.1.7-.2.9-.8.5-1.5 1.1-2.1 1.8-.3.3-.5.6-.8.8 0 0 0 0 0 0 .3.3.6.5 1 .7.5.3 1 .3 1.4 0 .3-.2.5-.5.5-.9v-1.7c0-.4.3-.7.7-.7h1.7c.4 0 .7.3.7.7v2.6c0 .5-.2.9-.6 1.2z"/>
-          </svg>
-          Войти через VK
-        </div>
-      </button>
     </div>
   );
 };
