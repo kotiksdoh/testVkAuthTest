@@ -5,11 +5,76 @@ const VKAuth: React.FC = () => {
     code: null,
     device_id: null
   });
+  const [tokenData, setTokenData] = useState<any>(null);
+  const [finalData, setFinalData] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleVKAuth = () => {
     const redirectUri = 'https://test-vk-auth-test-75j1.vercel.app/'
-    const vkAuthUrl = `https://id.vk.com/authorize?client_id=54352865&redirect_uri=${redirectUri}&response_type=code&scope=phone&state=efefefefs&code_challenge=WUJncXAtdTFiVkJGeF9WSlhURzlGMDhqNkx3eGZDeWFZWXRrMFZHMWhSOA==&code_challenge_method=S256`
+    const vkAuthUrl = `https://id.vk.com/authorize?client_id=54352865&redirect_uri=${redirectUri}&response_type=code&scope=&state=efefefefs&code_challenge=WUJncXAtdTFiVkJGeF9WSlhURzlGMDhqNkx3eGZDeWFZWXRrMFZHMWhSOA==&code_challenge_method=S256`
     location.assign(vkAuthUrl);
+  };
+
+  const exchangeCodeForToken = async (code: string, device_id: string) => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const formData = new URLSearchParams();
+      formData.append('code', code);
+      formData.append('client_id', '54352865');
+      formData.append('state', 'ldsaldsal');
+      formData.append('device_id', device_id);
+      formData.append('grant_type', 'authorization_code');
+      formData.append('redirect_uri', 'https://test-vk-auth-test-75j1.vercel.app/');
+      formData.append('code_verifier', 'WUJncXAtdTFiVkJGeF9WSlhURzlGMDhqNkx3eGZDeWFZWXRrMFZHMWhSOA==');
+    
+      const response = await fetch('https://id.vk.ru/oauth2/auth', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: formData.toString(),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      setTokenData(data);
+      console.log('Token response:', data);
+
+      const finalBody = JSON.stringify({
+        userPhone: '+79182291909',
+        accessToken: data,
+        deviceId: device_id,
+        appId: 54352865
+      });
+
+      const finalResponse = await fetch('https://test1.patrickmary.ru/api/data/open/iud_confirm_vk_phone', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: finalBody,
+      });
+
+      if (!finalResponse.ok) {
+        throw new Error(`Final request error! status: ${finalResponse.status}`);
+      }
+
+      const finallllData = await finalResponse.json();
+      setFinalData(finallllData);
+      console.log('Ура!!', finallllData);
+
+    } catch (err) {
+      console.error('Error exchanging code for token:', err);
+      setError(err instanceof Error ? err.message : 'Unknown error occurred');
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -26,32 +91,14 @@ const VKAuth: React.FC = () => {
       console.log('Извлеченные параметры:', { code, device_id });
 
       if (code && device_id) {
-      
+        exchangeCodeForToken(code, device_id);
       }
     }
   }, []);
 
-  // const sendToBackend = async (code: string, device_id: string) => {
-  //   try {
-  //     const response = await fetch('/your-backend-endpoint', {
-  //       method: 'POST',
-  //       headers: {
-  //         'Content-Type': 'application/json',
-  //       },
-  //       body: JSON.stringify({ code, device_id }),
-  //     });
-      
-  //     if (response.ok) {
-  //       console.log('Параметры успешно отправлены на сервер');
-  //     }
-  //   } catch (error) {
-  //     console.error('Ошибка при отправке параметров:', error);
-  //   }
-  // };
-
   return (
     <div className="vk-auth-container">
-      {(authParams?.code || authParams?.device_id) && (
+      {(authParams.code || authParams.device_id) && (
         <div className="auth-params">
           <h3>Параметры авторизации:</h3>
           <p><strong>Code:</strong> {authParams.code}</p>
@@ -59,9 +106,37 @@ const VKAuth: React.FC = () => {
         </div>
       )}
 
+      {loading && (
+        <div className="loading">
+          <p>Получение токена...</p>
+        </div>
+      )}
+
+      {error && (
+        <div className="error">
+          <h3>Ошибка:</h3>
+          <p>{error}</p>
+        </div>
+      )}
+
+      {tokenData && (
+        <div className="token-data">
+          <h3>Данные токена:</h3>
+          <pre>{JSON.stringify(tokenData, null, 2)}</pre>
+        </div>
+      )}
+
+      {finalData && (
+        <div className="final-data">
+          <h3>Финальный ответ:</h3>
+          <pre>{JSON.stringify(finalData, null, 2)}</pre>
+        </div>
+      )}
+
       <button 
         className="vk-auth-button"
         onClick={handleVKAuth}
+        disabled={loading}
       >
         <div className="vk-button-content">
           <svg className="vk-icon" width="20" height="20" viewBox="0 0 24 24">
