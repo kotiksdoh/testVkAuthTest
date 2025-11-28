@@ -1,6 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
 
-// Выносим хук PKCE отдельно
 const usePKCE = () => {
   const [codeVerifier, setCodeVerifier] = useState<string>('');
   const [codeChallenge, setCodeChallenge] = useState<string>('');
@@ -57,6 +56,7 @@ const VKAuth: React.FC = () => {
   const [finalData, setFinalData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [phoneNumber, setPhoneNumber] = useState<string>('');
   
   const { codeChallenge, codeVerifier, isLoading: pkceLoading } = usePKCE();
 
@@ -76,7 +76,6 @@ const VKAuth: React.FC = () => {
     setError(null);
     
     try {
-      // Получаем codeVerifier из localStorage, если в состоянии пусто
       const currentCodeVerifier = codeVerifier || localStorage.getItem('vk_code_verifier');
       
       if (!currentCodeVerifier) {
@@ -109,8 +108,9 @@ const VKAuth: React.FC = () => {
       setTokenData(data);
       console.log('Token response:', data);
 
+      // Используем введенный номер телефона вместо хардкода
       const finalBody = JSON.stringify({
-        userPhone: '+79182291909',
+        userPhone: phoneNumber, // Теперь используется введенный номер
         accessToken: data?.access_token,
         deviceId: device_id,
         appId: 54352865
@@ -157,10 +157,36 @@ const VKAuth: React.FC = () => {
         exchangeCodeForToken(code, device_id);
       }
     }
-  }, []);
+  }, [phoneNumber]); // Добавляем phoneNumber в зависимости
+
+  // Функция для валидации номера телефона
+  const isValidPhoneNumber = (phone: string): boolean => {
+    const phoneRegex = /^[\+]?[0-9\s\-\(\)]{10,15}$/;
+    return phoneRegex.test(phone);
+  };
+
+  const isButtonDisabled = loading || pkceLoading || !isValidPhoneNumber(phoneNumber);
 
   return (
     <div className="vk-auth-container">
+      <div className="phone-input-container">
+        <label htmlFor="phone" className="phone-label">
+          Номер телефона:
+        </label>
+        <input
+          id="phone"
+          type="tel"
+          value={phoneNumber}
+          onChange={(e) => setPhoneNumber(e.target.value)}
+          placeholder="+7 (900) 000-00-00"
+          className="phone-input"
+          disabled={loading}
+        />
+        {phoneNumber && !isValidPhoneNumber(phoneNumber) && (
+          <p className="phone-error">Введите корректный номер телефона</p>
+        )}
+      </div>
+
       {(authParams.code || authParams.device_id) && (
         <div className="auth-params">
           <h3>Параметры авторизации:</h3>
@@ -199,7 +225,7 @@ const VKAuth: React.FC = () => {
       <button 
         className="vk-auth-button"
         onClick={handleVKAuth}
-        disabled={loading || pkceLoading}
+        disabled={isButtonDisabled}
       >
         <div className="vk-button-content">
           <svg className="vk-icon" width="20" height="20" viewBox="0 0 24 24">
