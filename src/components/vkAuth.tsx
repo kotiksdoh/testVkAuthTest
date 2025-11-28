@@ -1,4 +1,52 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
+
+// Выносим хук PKCE отдельно
+const usePKCE = () => {
+  const [codeVerifier, setCodeVerifier] = useState<string>('');
+  const [codeChallenge, setCodeChallenge] = useState<string>('');
+  const [isLoading, setIsLoading] = useState(true);
+
+  const generateCodeVerifier = (): string => {
+    const array = new Uint8Array(32);
+    window.crypto.getRandomValues(array);
+    const base64 = btoa(Array.from(array, (byte) => String.fromCharCode(byte)).join(''));
+    return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+  };
+
+  const generateCodeChallenge = async (verifier: string): Promise<string> => {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(verifier);
+    const hash = await window.crypto.subtle.digest('SHA-256', data);
+  
+    const hashArray = new Uint8Array(hash);
+    const base64 = btoa(Array.from(hashArray, (byte) => String.fromCharCode(byte)).join(''));
+  
+    return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+  };
+
+  useEffect(() => {
+    const generatePKCE = async () => {
+      setIsLoading(true);
+      try {
+        const verifier = generateCodeVerifier();
+        const challenge = await generateCodeChallenge(verifier);
+
+        setCodeVerifier(verifier);
+        setCodeChallenge(challenge);
+
+        localStorage.setItem('vk_code_verifier', verifier);
+      } catch (error) {
+        console.error('Error generating PKCE:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    generatePKCE();
+  }, []);
+
+  return { codeVerifier, codeChallenge, isLoading };
+};
 
 const VKAuth: React.FC = () => {
   const [authParams, setAuthParams] = useState<{ code: string | null; device_id: string | null }>({
@@ -10,55 +58,31 @@ const VKAuth: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
-  const usePKCE = () => {
-    const [codeVerifier, setCodeVerifier] = useState<string>('');
-    const [codeChallenge, setCodeChallenge] = useState<string>('');
-    const generateCodeVerifier = (): string => {
-      const array = new Uint8Array(32);
-      window.crypto.getRandomValues(array);
-      const base64 = btoa(Array.from(array, (byte) => String.fromCharCode(byte)).join(''));
-      return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
-    };
-    const generateCodeChallenge = async (verifier: string): Promise<string> => {
-      const encoder = new TextEncoder();
-      const data = encoder.encode(verifier);
-      const hash = await window.crypto.subtle.digest('SHA-256', data);
-    
-      const hashArray = new Uint8Array(hash);
-      const base64 = btoa(Array.from(hashArray, (byte) => String.fromCharCode(byte)).join(''));
-    
-      return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
-    };
-    useEffect(() => {
-      const generatePKCE = async () => {
-        const verifier = generateCodeVerifier();
-        const challenge = await generateCodeChallenge(verifier);
-  
-        setCodeVerifier(verifier);
-        setCodeChallenge(challenge);
-  
-        // Сохраняем в localStorage для использования после редиректа
-        localStorage.setItem('vk_code_verifier', verifier);
-      };
-  
-      generatePKCE();
-    }, []);
-  
-    return { codeVerifier, codeChallenge };
-  };
-  
-  const { codeChallenge } = usePKCE();
-  const handleVKAuth = () => {
-    const redirectUri = 'https://test-vk-auth-test-75j1.vercel.app/'
-    const vkAuthUrl = `https://id.vk.com/authorize?client_id=54352865&redirect_uri=${redirectUri}&response_type=code&scope=&state=efefefefs&code_challenge=${codeChallenge}&code_challenge_method=S256`
+  const { codeChallenge, codeVerifier, isLoading: pkceLoading } = usePKCE();
+
+  const handleVKAuth = useCallback(() => {
+    if (pkceLoading || !codeChallenge) {
+      console.error('PKCE not ready yet');
+      return;
+    }
+
+    const redirectUri = 'https://test-vk-auth-test-75j1.vercel.app/';
+    const vkAuthUrl = `https://id.vk.com/authorize?client_id=54352865&redirect_uri=${redirectUri}&response_type=code&scope=&state=efefefefs&code_challenge=${codeChallenge}&code_challenge_method=S256`;
     location.assign(vkAuthUrl);
-  };
+  }, [codeChallenge, pkceLoading]);
 
   const exchangeCodeForToken = async (code: string, device_id: string) => {
     setLoading(true);
     setError(null);
     
     try {
+      // Получаем codeVerifier из localStorage, если в состоянии пусто
+      const currentCodeVerifier = codeVerifier || localStorage.getItem('vk_code_verifier');
+      
+      if (!currentCodeVerifier) {
+        throw new Error('Code verifier not found');
+      }
+
       const formData = new URLSearchParams();
       formData.append('code', code);
       formData.append('client_id', '54352865');
@@ -66,7 +90,7 @@ const VKAuth: React.FC = () => {
       formData.append('device_id', device_id);
       formData.append('grant_type', 'authorization_code');
       formData.append('redirect_uri', 'https://test-vk-auth-test-75j1.vercel.app/');
-      formData.append('code_verifier', `${codeChallenge}`);
+      formData.append('code_verifier', currentCodeVerifier);
     
       const response = await fetch('https://id.vk.ru/oauth2/auth', {
         method: 'POST',
@@ -77,7 +101,8 @@ const VKAuth: React.FC = () => {
       });
 
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        const errorText = await response.text();
+        throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
       }
 
       const data = await response.json();
@@ -144,9 +169,9 @@ const VKAuth: React.FC = () => {
         </div>
       )}
 
-      {loading && (
+      {(loading || pkceLoading) && (
         <div className="loading">
-          <p>Получение токена...</p>
+          <p>{pkceLoading ? 'Подготовка авторизации...' : 'Получение токена...'}</p>
         </div>
       )}
 
@@ -174,7 +199,7 @@ const VKAuth: React.FC = () => {
       <button 
         className="vk-auth-button"
         onClick={handleVKAuth}
-        disabled={loading}
+        disabled={loading || pkceLoading}
       >
         <div className="vk-button-content">
           <svg className="vk-icon" width="20" height="20" viewBox="0 0 24 24">
