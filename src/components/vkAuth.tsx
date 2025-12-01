@@ -134,7 +134,7 @@ const VKAuth: React.FC = () => {
         userPhone: phoneNumber, 
         accessToken: tokenData.access_token,
         deviceId: authParams.device_id,
-        appId: 54352865
+        appId: 54360856
       });
 
       console.log('Sending final request with phone:', phoneNumber);
