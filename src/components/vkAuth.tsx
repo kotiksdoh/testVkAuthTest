@@ -88,7 +88,7 @@ const VKAuth: React.FC = () => {
       formData.append('code', code);
       formData.append('client_id', '54360856');
       formData.append('state', 'ldsaldsalssss');
-      formData.append('device_id', device_id);
+      formData.append('deviceId', device_id);
       formData.append('grant_type', 'authorization_code');
       formData.append('redirect_uri', 'https://test-vk-auth-test-75j1.vercel.app/');
       formData.append('code_verifier', currentCodeVerifier);
