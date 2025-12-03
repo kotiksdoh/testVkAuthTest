@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 
 // Добавляем интерфейс для сообщений
 interface VKAuthMessage {
@@ -134,43 +134,43 @@ const VKAuth: React.FC = () => {
     };
   }, [authWindow]);
 
-  const handleVKAuth = useCallback(() => {
-    if (pkceLoading || !codeChallenge || isAuthInProgress) {
-      console.error('PKCE not ready yet or auth in progress');
-      return;
-    }
+  // const handleVKAuth = useCallback(() => {
+  //   if (pkceLoading || !codeChallenge || isAuthInProgress) {
+  //     console.error('PKCE not ready yet or auth in progress');
+  //     return;
+  //   }
 
-    setIsAuthInProgress(true);
-    setError(null);
+  //   setIsAuthInProgress(true);
+  //   setError(null);
 
-    const vkAuthUrl = `https://id.vk.com/authorize?client_id=54360856&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=phone&state=efefefefs&code_challenge=${codeChallenge}&code_challenge_method=S256`;
+  //   const vkAuthUrl = `https://id.vk.com/authorize?client_id=54360856&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=phone&state=efefefefs&code_challenge=${codeChallenge}&code_challenge_method=S256`;
     
-    // Открываем окно с определенными размерами
-    const width = 600;
-    const height = 700;
-    const left = (window.screen.width - width) / 2;
-    const top = (window.screen.height - height) / 2;
+  //   // Открываем окно с определенными размерами
+  //   const width = 600;
+  //   const height = 700;
+  //   const left = (window.screen.width - width) / 2;
+  //   const top = (window.screen.height - height) / 2;
     
-    const popup = window.open(
-      vkAuthUrl,
-      'VK Auth',
-      `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes,toolbar=no,menubar=no,location=no,directories=no,status=no`
-    );
+  //   const popup = window.open(
+  //     vkAuthUrl,
+  //     'VK Auth',
+  //     `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes,toolbar=no,menubar=no,location=no,directories=no,status=no`
+  //   );
     
-    if (!popup) {
-      setError('Браузер заблокировал всплывающее окно. Разрешите всплывающие окна для этого сайта.');
-      setIsAuthInProgress(false);
-      return;
-    }
+  //   if (!popup) {
+  //     setError('Браузер заблокировал всплывающее окно. Разрешите всплывающие окна для этого сайта.');
+  //     setIsAuthInProgress(false);
+  //     return;
+  //   }
     
-    setAuthWindow(popup);
+  //   setAuthWindow(popup);
     
-    // Добавляем HTML-страницу для обработки callback в redirectUri
-    // Этот код будет вставлен в новое окно после авторизации
-    // Мы создаем скрытый iframe или ожидаем, что VK вернет нас на redirectUri
-    // В реальном проекте вам нужно будет разместить HTML-страницу на вашем redirectUri домене
+  //   // Добавляем HTML-страницу для обработки callback в redirectUri
+  //   // Этот код будет вставлен в новое окно после авторизации
+  //   // Мы создаем скрытый iframe или ожидаем, что VK вернет нас на redirectUri
+  //   // В реальном проекте вам нужно будет разместить HTML-страницу на вашем redirectUri домене
     
-  }, [codeChallenge, pkceLoading, isAuthInProgress]);
+  // }, [codeChallenge, pkceLoading, isAuthInProgress]);
 
   // Компонент, который нужно разместить на вашем redirectUri (https://test-vk-auth-test-75j1.vercel.app/)
   // Это пример кода для страницы callback.html:
