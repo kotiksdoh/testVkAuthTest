@@ -1,5 +1,5 @@
-// components/vkAuth.tsx
 import React, { useEffect, useState, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 // Добавляем интерфейс для сообщений
 interface VKAuthMessage {
@@ -71,11 +71,12 @@ const VKAuth: React.FC = () => {
   const [showPhoneInput, setShowPhoneInput] = useState(false);
   const [authWindow, setAuthWindow] = useState<Window | null>(null);
   const [isAuthInProgress, setIsAuthInProgress] = useState(false);
+  const navigate = useNavigate();
   
   const { codeChallenge, codeVerifier, isLoading: pkceLoading } = usePKCE();
   
-  // Теперь redirectUri указывает на наш собственный роут
-  const redirectUri = `${window.location.origin}/vk-callback`;
+  // Redirect URI - корневой путь нашего приложения
+  const redirectUri = window.location.origin;
   const currentOrigin = window.location.origin;
 
   // Слушаем сообщения от окна авторизации
@@ -83,7 +84,7 @@ const VKAuth: React.FC = () => {
     const handleMessage = (event: MessageEvent) => {
       console.log('Message received from:', event.origin, 'Data:', event.data);
       
-      // Проверяем origin для безопасности - теперь это наш же домен!
+      // Проверяем origin для безопасности
       if (event.origin !== currentOrigin) {
         console.warn('Ignoring message from unknown origin:', event.origin);
         return;
@@ -140,33 +141,47 @@ const VKAuth: React.FC = () => {
     };
   }, [authWindow]);
 
-  // Проверяем sessionStorage на наличие параметров
-  // (если callback открылся в том же окне, а не в popup)
+  // Проверяем localStorage на наличие callback параметров
+  // (если callback сработал в том же окне/вкладке)
   useEffect(() => {
-    const checkSessionStorage = () => {
-      const storedCode = sessionStorage.getItem('vk_auth_code');
-      const storedDeviceId = sessionStorage.getItem('vk_auth_device_id');
+    const checkForCallbackParams = () => {
+      const storedCode = localStorage.getItem('vk_callback_code');
+      const storedDeviceId = localStorage.getItem('vk_callback_device_id');
+      const storedTimestamp = localStorage.getItem('vk_callback_timestamp');
       
-      if (storedCode && storedDeviceId && !authParams.code && !authParams.device_id) {
-        console.log('Found auth params in sessionStorage:', { storedCode, storedDeviceId });
+      if (storedCode && storedDeviceId && storedTimestamp) {
+        const timestamp = parseInt(storedTimestamp, 10);
+        const now = Date.now();
         
-        setAuthParams({
-          code: storedCode,
-          device_id: storedDeviceId
-        });
-        
-        // Очищаем sessionStorage
-        sessionStorage.removeItem('vk_auth_code');
-        sessionStorage.removeItem('vk_auth_device_id');
-        sessionStorage.removeItem('vk_auth_state');
-        
-        // Обменяем code на token
-        exchangeCodeForToken(storedCode, storedDeviceId);
+        // Проверяем, что данные не старше 5 минут
+        if (now - timestamp < 5 * 60 * 1000) {
+          console.log('Found recent callback params in localStorage:', { storedCode, storedDeviceId });
+          
+          setAuthParams({
+            code: storedCode,
+            device_id: storedDeviceId
+          });
+          
+          // Очищаем localStorage
+          localStorage.removeItem('vk_callback_code');
+          localStorage.removeItem('vk_callback_device_id');
+          localStorage.removeItem('vk_callback_state');
+          localStorage.removeItem('vk_callback_timestamp');
+          
+          // Обменяем code на token
+          exchangeCodeForToken(storedCode, storedDeviceId);
+        } else {
+          // Слишком старые данные - очищаем
+          localStorage.removeItem('vk_callback_code');
+          localStorage.removeItem('vk_callback_device_id');
+          localStorage.removeItem('vk_callback_state');
+          localStorage.removeItem('vk_callback_timestamp');
+        }
       }
     };
 
-    checkSessionStorage();
-  }, [authParams.code, authParams.device_id]);
+    checkForCallbackParams();
+  }, []);
 
   const handleVKAuth = useCallback(() => {
     if (pkceLoading || !codeChallenge || isAuthInProgress) {
@@ -181,7 +196,7 @@ const VKAuth: React.FC = () => {
     const state = Math.random().toString(36).substring(2) + 
                   Date.now().toString(36);
     
-    sessionStorage.setItem('vk_auth_state', state);
+    localStorage.setItem('vk_auth_state', state);
 
     const vkAuthUrl = `https://id.vk.com/authorize?client_id=54360856&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=phone&state=${state}&code_challenge=${codeChallenge}&code_challenge_method=S256`;
     
@@ -318,25 +333,17 @@ const VKAuth: React.FC = () => {
     }
   };
 
-  // Инициализация из URL (на случай прямого открытия с параметрами)
+  // Инициализация из URL (на случай если пользователь напрямую зашел с параметрами)
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const code = urlParams.get('code');
     const device_id = urlParams.get('device_id');
 
     if (code || device_id) {
-      setAuthParams({
-        code,
-        device_id
-      });
-
-      console.log('Извлеченные параметры из URL:', { code, device_id });
-
-      if (code && device_id) {
-        exchangeCodeForToken(code, device_id);
-      }
+      // Если есть параметры - это callback, редиректим на корень
+      navigate('/');
     }
-  }, []);
+  }, [navigate]);
 
   const isValidPhoneNumber = (phone: string): boolean => {
     const phoneRegex = /^[\+]?[0-9\s\-\(\)]{10,15}$/;

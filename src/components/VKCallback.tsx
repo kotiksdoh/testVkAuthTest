@@ -1,4 +1,3 @@
-// components/VKCallback.tsx
 import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -17,6 +16,9 @@ const VKCallback: React.FC = () => {
         console.log('Callback received params:', { code, device_id, state });
 
         if (code && device_id) {
+          // Проверяем, есть ли параметры авторизации
+          // Если есть - значит это callback от VK
+          
           // Отправляем сообщение родительскому окну (если есть)
           if (window.opener && !window.opener.closed) {
             window.opener.postMessage({
@@ -26,29 +28,31 @@ const VKCallback: React.FC = () => {
               state: state
             }, window.location.origin);
             
-            console.log('Message sent to opener from:', window.location.origin);
+            console.log('Message sent to opener');
             
             // Закрываем окно через короткую задержку
             setTimeout(() => {
               window.close();
             }, 300);
           } else {
-            // Если нет родительского окна, сохраняем в sessionStorage
-            // и редиректим обратно
-            sessionStorage.setItem('vk_auth_code', code);
-            sessionStorage.setItem('vk_auth_device_id', device_id);
-            sessionStorage.setItem('vk_auth_state', state);
+            // Если нет родительского окна, сохраняем в localStorage/sessionStorage
+            // и редиректим на страницу авторизации
+            localStorage.setItem('vk_callback_code', code);
+            localStorage.setItem('vk_callback_device_id', device_id);
+            localStorage.setItem('vk_callback_state', state);
+            localStorage.setItem('vk_callback_timestamp', Date.now().toString());
             
-            // Редирект на основную страницу
-            navigate('/');
+            // Редирект на страницу авторизации
+            navigate('/auth');
           }
         } else {
-          console.warn('Missing code or device_id parameters');
-          navigate('/');
+          // Если нет параметров авторизации - это первое открытие страницы
+          // Редиректим на страницу авторизации
+          navigate('/auth');
         }
       } catch (error) {
         console.error('Error in callback handling:', error);
-        navigate('/');
+        navigate('/auth');
       }
     };
 

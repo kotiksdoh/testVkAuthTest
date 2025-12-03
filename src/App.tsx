@@ -7,8 +7,8 @@ function App() {
   return (
     <Router>
       <Routes>
-        <Route path="/" element={<VKAuth />} />
-        <Route path="/vk-callback" element={<VKCallback />} />
+        <Route path="/" element={<VKCallback />} />
+        <Route path="/auth" element={<VKAuth />} />
       </Routes>
     </Router>
   )
