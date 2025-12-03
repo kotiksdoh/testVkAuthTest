@@ -1,3 +1,4 @@
+// components/vkAuth.tsx
 import React, { useEffect, useState, useCallback } from 'react';
 
 // Добавляем интерфейс для сообщений
@@ -5,6 +6,7 @@ interface VKAuthMessage {
   type: 'VK_AUTH_SUCCESS';
   code: string;
   device_id: string;
+  state?: string;
 }
 
 // Хук для PKCE оставляем без изменений
@@ -72,15 +74,17 @@ const VKAuth: React.FC = () => {
   
   const { codeChallenge, codeVerifier, isLoading: pkceLoading } = usePKCE();
   
-  // Для отслеживания origin
-  const redirectUri = 'https://test-vk-auth-test-75j1.vercel.app/';
-  const redirectUriOrigin = 'https://test-vk-auth-test-75j1.vercel.app';
+  // Теперь redirectUri указывает на наш собственный роут
+  const redirectUri = `${window.location.origin}/vk-callback`;
+  const currentOrigin = window.location.origin;
 
   // Слушаем сообщения от окна авторизации
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
-      // Проверяем origin для безопасности
-      if (event.origin !== redirectUriOrigin) {
+      console.log('Message received from:', event.origin, 'Data:', event.data);
+      
+      // Проверяем origin для безопасности - теперь это наш же домен!
+      if (event.origin !== currentOrigin) {
         console.warn('Ignoring message from unknown origin:', event.origin);
         return;
       }
@@ -103,7 +107,9 @@ const VKAuth: React.FC = () => {
         });
         
         // Обменяем code на token
-        exchangeCodeForToken(data.code, data.device_id);
+        if (data.code && data.device_id) {
+          exchangeCodeForToken(data.code, data.device_id);
+        }
         
         setIsAuthInProgress(false);
       }
@@ -114,7 +120,7 @@ const VKAuth: React.FC = () => {
     return () => {
       window.removeEventListener('message', handleMessage);
     };
-  }, [authWindow]);
+  }, [authWindow, currentOrigin]);
 
   // Проверяем закрытие окна пользователем
   useEffect(() => {
@@ -134,81 +140,35 @@ const VKAuth: React.FC = () => {
     };
   }, [authWindow]);
 
-  // const handleVKAuth = useCallback(() => {
-  //   if (pkceLoading || !codeChallenge || isAuthInProgress) {
-  //     console.error('PKCE not ready yet or auth in progress');
-  //     return;
-  //   }
+  // Проверяем sessionStorage на наличие параметров
+  // (если callback открылся в том же окне, а не в popup)
+  useEffect(() => {
+    const checkSessionStorage = () => {
+      const storedCode = sessionStorage.getItem('vk_auth_code');
+      const storedDeviceId = sessionStorage.getItem('vk_auth_device_id');
+      
+      if (storedCode && storedDeviceId && !authParams.code && !authParams.device_id) {
+        console.log('Found auth params in sessionStorage:', { storedCode, storedDeviceId });
+        
+        setAuthParams({
+          code: storedCode,
+          device_id: storedDeviceId
+        });
+        
+        // Очищаем sessionStorage
+        sessionStorage.removeItem('vk_auth_code');
+        sessionStorage.removeItem('vk_auth_device_id');
+        sessionStorage.removeItem('vk_auth_state');
+        
+        // Обменяем code на token
+        exchangeCodeForToken(storedCode, storedDeviceId);
+      }
+    };
 
-  //   setIsAuthInProgress(true);
-  //   setError(null);
+    checkSessionStorage();
+  }, [authParams.code, authParams.device_id]);
 
-  //   const vkAuthUrl = `https://id.vk.com/authorize?client_id=54360856&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=phone&state=efefefefs&code_challenge=${codeChallenge}&code_challenge_method=S256`;
-    
-  //   // Открываем окно с определенными размерами
-  //   const width = 600;
-  //   const height = 700;
-  //   const left = (window.screen.width - width) / 2;
-  //   const top = (window.screen.height - height) / 2;
-    
-  //   const popup = window.open(
-  //     vkAuthUrl,
-  //     'VK Auth',
-  //     `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes,toolbar=no,menubar=no,location=no,directories=no,status=no`
-  //   );
-    
-  //   if (!popup) {
-  //     setError('Браузер заблокировал всплывающее окно. Разрешите всплывающие окна для этого сайта.');
-  //     setIsAuthInProgress(false);
-  //     return;
-  //   }
-    
-  //   setAuthWindow(popup);
-    
-  //   // Добавляем HTML-страницу для обработки callback в redirectUri
-  //   // Этот код будет вставлен в новое окно после авторизации
-  //   // Мы создаем скрытый iframe или ожидаем, что VK вернет нас на redirectUri
-  //   // В реальном проекте вам нужно будет разместить HTML-страницу на вашем redirectUri домене
-    
-  // }, [codeChallenge, pkceLoading, isAuthInProgress]);
-
-  // Компонент, который нужно разместить на вашем redirectUri (https://test-vk-auth-test-75j1.vercel.app/)
-  // Это пример кода для страницы callback.html:
-  /*
-  <!DOCTYPE html>
-  <html>
-  <head>
-      <title>VK Auth Callback</title>
-      <script>
-          // Получаем параметры из URL
-          const urlParams = new URLSearchParams(window.location.search);
-          const code = urlParams.get('code');
-          const device_id = urlParams.get('device_id');
-          
-          if (code && device_id) {
-              // Отправляем параметры обратно в родительское окно
-              window.opener.postMessage({
-                  type: 'VK_AUTH_SUCCESS',
-                  code: code,
-                  device_id: device_id
-              }, 'https://ваш-домен-приложения.com');
-              
-              // Закрываем окно через короткую задержку
-              setTimeout(() => {
-                  window.close();
-              }, 100);
-          }
-      </script>
-  </head>
-  <body>
-      <p>Авторизация завершена. Закрытие окна...</p>
-  </body>
-  </html>
-  */
-
-  // Но если вы не можете изменить страницу на redirectUri,
-  // можно использовать альтернативный подход с промежуточной страницей:
-  const handleVKAuthAlternative = useCallback(() => {
+  const handleVKAuth = useCallback(() => {
     if (pkceLoading || !codeChallenge || isAuthInProgress) {
       console.error('PKCE not ready yet or auth in progress');
       return;
@@ -217,16 +177,15 @@ const VKAuth: React.FC = () => {
     setIsAuthInProgress(true);
     setError(null);
 
-    // Создаем уникальный ID для этой сессии
-    const sessionId = Date.now().toString();
-    localStorage.setItem('vk_auth_session_id', sessionId);
+    // Генерируем уникальный state для защиты от CSRF
+    const state = Math.random().toString(36).substring(2) + 
+                  Date.now().toString(36);
     
-    // Сохраняем ожидаемые параметры
-    localStorage.setItem('vk_expected_code', 'pending');
-    localStorage.setItem('vk_expected_device_id', 'pending');
+    sessionStorage.setItem('vk_auth_state', state);
 
-    const vkAuthUrl = `https://id.vk.com/authorize?client_id=54360856&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=phone&state=${sessionId}&code_challenge=${codeChallenge}&code_challenge_method=S256`;
+    const vkAuthUrl = `https://id.vk.com/authorize?client_id=54360856&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=phone&state=${state}&code_challenge=${codeChallenge}&code_challenge_method=S256`;
     
+    // Открываем окно с определенными размерами
     const width = 600;
     const height = 700;
     const left = (window.screen.width - width) / 2;
@@ -235,7 +194,7 @@ const VKAuth: React.FC = () => {
     const popup = window.open(
       vkAuthUrl,
       'VK Auth',
-      `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes`
+      `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes,toolbar=no,menubar=no,location=no,directories=no,status=no`
     );
     
     if (!popup) {
@@ -246,48 +205,18 @@ const VKAuth: React.FC = () => {
     
     setAuthWindow(popup);
     
-    // Периодически проверяем localStorage на наличие параметров
-    const checkForParams = setInterval(() => {
-      const storedCode = localStorage.getItem('vk_auth_code');
-      const storedDeviceId = localStorage.getItem('vk_auth_device_id');
-      const storedSessionId = localStorage.getItem('vk_auth_session_id');
-      
-      if (storedCode && storedDeviceId && storedSessionId === sessionId) {
-        clearInterval(checkForParams);
-        
-        // Очищаем localStorage
-        localStorage.removeItem('vk_auth_code');
-        localStorage.removeItem('vk_auth_device_id');
-        localStorage.removeItem('vk_auth_session_id');
-        localStorage.removeItem('vk_expected_code');
-        localStorage.removeItem('vk_expected_device_id');
-        
-        if (popup) {
-          popup.close();
-          setAuthWindow(null);
-        }
-        
-        setAuthParams({
-          code: storedCode,
-          device_id: storedDeviceId
-        });
-        
-        exchangeCodeForToken(storedCode, storedDeviceId);
-        setIsAuthInProgress(false);
-      }
-    }, 500);
-    
-    // Останавливаем проверку через 5 минут
+    // Таймаут для авторизации (5 минут)
     setTimeout(() => {
-      clearInterval(checkForParams);
-      if (isAuthInProgress) {
-        setError('Время авторизации истекло. Попробуйте снова.');
-        setIsAuthInProgress(false);
+      if (isAuthInProgress && authWindow) {
+        console.log('Auth timeout - closing window');
+        authWindow.close();
         setAuthWindow(null);
+        setIsAuthInProgress(false);
+        setError('Время авторизации истекло. Попробуйте снова.');
       }
     }, 5 * 60 * 1000);
     
-  }, [codeChallenge, pkceLoading, isAuthInProgress]);
+  }, [codeChallenge, pkceLoading, isAuthInProgress, redirectUri]);
 
   const exchangeCodeForToken = async (code: string, device_id: string) => {
     setLoading(true);
@@ -479,7 +408,7 @@ const VKAuth: React.FC = () => {
           
           <button 
             className="vk-auth-button"
-            onClick={handleVKAuthAlternative} // Используем альтернативный метод
+            onClick={handleVKAuth}
             disabled={isAuthButtonDisabled}
           >
             {pkceLoading || isAuthInProgress ? (
