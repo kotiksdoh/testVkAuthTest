@@ -1,5 +1,4 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
 
 // Добавляем интерфейс для сообщений
 interface VKAuthMessage {
@@ -9,7 +8,7 @@ interface VKAuthMessage {
   state?: string;
 }
 
-// Хук для PKCE оставляем без изменений
+// Хук для PKCE
 const usePKCE = () => {
   const [codeVerifier, setCodeVerifier] = useState<string>('');
   const [codeChallenge, setCodeChallenge] = useState<string>('');
@@ -71,13 +70,13 @@ const VKAuth: React.FC = () => {
   const [showPhoneInput, setShowPhoneInput] = useState(false);
   const [authWindow, setAuthWindow] = useState<Window | null>(null);
   const [isAuthInProgress, setIsAuthInProgress] = useState(false);
-  const navigate = useNavigate();
+  const [isPopupMode, setIsPopupMode] = useState(false);
   
   const { codeChallenge, codeVerifier, isLoading: pkceLoading } = usePKCE();
   
   // Redirect URI - корневой путь нашего приложения
-  const redirectUri = window.location.origin;
-  const currentOrigin = window.location.origin;
+  const redirectUri = 'https://test-vk-auth-test-75j1.vercel.app/';
+  const currentOrigin = 'https://test-vk-auth-test-75j1.vercel.app';
 
   // Слушаем сообщения от окна авторизации
   useEffect(() => {
@@ -141,47 +140,37 @@ const VKAuth: React.FC = () => {
     };
   }, [authWindow]);
 
-  // Проверяем localStorage на наличие callback параметров
-  // (если callback сработал в том же окне/вкладке)
+  // Проверяем, открыта ли страница в popup
   useEffect(() => {
-    const checkForCallbackParams = () => {
-      const storedCode = localStorage.getItem('vk_callback_code');
-      const storedDeviceId = localStorage.getItem('vk_callback_device_id');
-      const storedTimestamp = localStorage.getItem('vk_callback_timestamp');
+    const urlParams = new URLSearchParams(window.location.search);
+    const code = urlParams.get('code');
+    const device_id = urlParams.get('device_id');
+    
+    if (code && device_id && window.opener) {
+      // Мы в popup окне и получили параметры
+      setIsPopupMode(true);
       
-      if (storedCode && storedDeviceId && storedTimestamp) {
-        const timestamp = parseInt(storedTimestamp, 10);
-        const now = Date.now();
-        
-        // Проверяем, что данные не старше 5 минут
-        if (now - timestamp < 5 * 60 * 1000) {
-          console.log('Found recent callback params in localStorage:', { storedCode, storedDeviceId });
-          
-          setAuthParams({
-            code: storedCode,
-            device_id: storedDeviceId
-          });
-          
-          // Очищаем localStorage
-          localStorage.removeItem('vk_callback_code');
-          localStorage.removeItem('vk_callback_device_id');
-          localStorage.removeItem('vk_callback_state');
-          localStorage.removeItem('vk_callback_timestamp');
-          
-          // Обменяем code на token
-          exchangeCodeForToken(storedCode, storedDeviceId);
-        } else {
-          // Слишком старые данные - очищаем
-          localStorage.removeItem('vk_callback_code');
-          localStorage.removeItem('vk_callback_device_id');
-          localStorage.removeItem('vk_callback_state');
-          localStorage.removeItem('vk_callback_timestamp');
-        }
-      }
-    };
-
-    checkForCallbackParams();
-  }, []);
+      // Отправляем параметры родительскому окну
+      window.opener.postMessage({
+        type: 'VK_AUTH_SUCCESS',
+        code: code,
+        device_id: device_id
+      }, currentOrigin);
+      
+      // Закрываем окно
+      setTimeout(() => {
+        window.close();
+      }, 1000);
+    } else if (code && device_id) {
+      // Мы в основном окне и получили параметры напрямую
+      setAuthParams({
+        code: code,
+        device_id: device_id
+      });
+      
+      exchangeCodeForToken(code, device_id);
+    }
+  }, [currentOrigin]);
 
   const handleVKAuth = useCallback(() => {
     if (pkceLoading || !codeChallenge || isAuthInProgress) {
@@ -192,13 +181,7 @@ const VKAuth: React.FC = () => {
     setIsAuthInProgress(true);
     setError(null);
 
-    // Генерируем уникальный state для защиты от CSRF
-    const state = Math.random().toString(36).substring(2) + 
-                  Date.now().toString(36);
-    
-    localStorage.setItem('vk_auth_state', state);
-
-    const vkAuthUrl = `https://id.vk.com/authorize?client_id=54360856&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=phone&state=${state}&code_challenge=${codeChallenge}&code_challenge_method=S256`;
+    const vkAuthUrl = `https://id.vk.com/authorize?client_id=54360856&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=phone&state=efefefefs&code_challenge=${codeChallenge}&code_challenge_method=S256`;
     
     // Открываем окно с определенными размерами
     const width = 600;
@@ -231,7 +214,7 @@ const VKAuth: React.FC = () => {
       }
     }, 5 * 60 * 1000);
     
-  }, [codeChallenge, pkceLoading, isAuthInProgress, redirectUri]);
+  }, [codeChallenge, pkceLoading, isAuthInProgress, redirectUri, authWindow]);
 
   const exchangeCodeForToken = async (code: string, device_id: string) => {
     setLoading(true);
@@ -333,18 +316,6 @@ const VKAuth: React.FC = () => {
     }
   };
 
-  // Инициализация из URL (на случай если пользователь напрямую зашел с параметрами)
-  useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const code = urlParams.get('code');
-    const device_id = urlParams.get('device_id');
-
-    if (code || device_id) {
-      // Если есть параметры - это callback, редиректим на корень
-      navigate('/');
-    }
-  }, [navigate]);
-
   const isValidPhoneNumber = (phone: string): boolean => {
     const phoneRegex = /^[\+]?[0-9\s\-\(\)]{10,15}$/;
     return phoneRegex.test(phone);
@@ -352,6 +323,17 @@ const VKAuth: React.FC = () => {
 
   const isAuthButtonDisabled = loading || pkceLoading || isAuthInProgress;
   const isSendButtonDisabled = loading || !isValidPhoneNumber(phoneNumber);
+
+  // Если мы в popup режиме - показываем только сообщение
+  if (isPopupMode) {
+    return (
+      <div className="popup-container">
+        <div className="spinner"></div>
+        <h1>Авторизация завершена</h1>
+        <p>Закрытие окна...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="vk-auth-container">
